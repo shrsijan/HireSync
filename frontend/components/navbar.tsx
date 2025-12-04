@@ -5,9 +5,15 @@ import Image from "next/image"
 import { useSession, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
 import Logo from "@/public/logo.svg";
+import { useEffect, useState } from "react"
 
 export function Navbar() {
     const { data: session } = useSession()
+    const [mounted, setMounted] = useState(false)
+
+    useEffect(() => {
+        setMounted(true)
+    }, [])
 
     return (
         <nav className="border-b">
@@ -16,7 +22,7 @@ export function Navbar() {
                     <Image src={Logo} alt="Logo" width={300} height={300} />
                 </Link>
 
-                {session && (
+                {mounted && session && (
                     <div className="flex items-center space-x-4 lg:space-x-6 mx-6">
                         <Link
                             href="/dashboard"
@@ -27,7 +33,10 @@ export function Navbar() {
                     </div>
                 )}
                 <div className="ml-auto flex items-center space-x-4">
-                    {session ? (
+                    {!mounted ? (
+                        // Render placeholder during SSR to avoid hydration mismatch
+                        <div className="w-32 h-9" />
+                    ) : session ? (
                         <Button
                             variant="ghost"
                             onClick={() => signOut({ callbackUrl: "/" })}
