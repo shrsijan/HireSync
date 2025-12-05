@@ -15,11 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function InterviewPage() {
     const router = useRouter()
-    const [code, setCode] = useState("// Start coding here...")
-    const [language, setLanguage] = useState("javascript")
+    const [code, setCode] = useState("# Two Sum Problem\n# Given an array of integers nums and an integer target,\n# return indices of the two numbers such that they add up to target.\n\ndef twoSum(nums, target):\n    # Your code here\n    pass")
+    const [language, setLanguage] = useState("python")
     const [output, setOutput] = useState("")
     const [error, setError] = useState("")
     const [isRunning, setIsRunning] = useState(false)
+    const [testResults, setTestResults] = useState<any>(null)
     const [timeLeft, setTimeLeft] = useState(3600) // 60 minutes in seconds
     const [currentQuestion, setCurrentQuestion] = useState(1)
     const [totalQuestions, setTotalQuestions] = useState(3)
@@ -32,7 +33,27 @@ export default function InterviewPage() {
         question: {
             title: "Two Sum Problem",
             description: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.\n\nExample:\nInput: nums = [2,7,11,15], target = 9\nOutput: [0,1]\nExplanation: Because nums[0] + nums[1] == 9, we return [0, 1].",
-            difficulty: "Medium"
+            difficulty: "Medium",
+            testCases: [
+                {
+                    input: "twoSum([2, 7, 11, 15], 9)",
+                    expected: "[0, 1]",
+                    type: "function_call",
+                    description: "Example case: nums = [2,7,11,15], target = 9"
+                },
+                {
+                    input: "twoSum([3, 2, 4], 6)",
+                    expected: "[1, 2]",
+                    type: "function_call",
+                    description: "Test case: nums = [3,2,4], target = 6"
+                },
+                {
+                    input: "twoSum([3, 3], 6)",
+                    expected: "[0, 1]",
+                    type: "function_call",
+                    description: "Test case with duplicate numbers: nums = [3,3], target = 6"
+                }
+            ]
         }
     })
 
@@ -75,23 +96,47 @@ export default function InterviewPage() {
         setIsRunning(true)
         setOutput("")
         setError("")
+        setTestResults(null)
 
         try {
             const API_URL = "http://localhost:5001/api"
+            const testCases = assessment.question.testCases || []
+            
             const response = await fetch(`${API_URL}/execute`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code, language })
+                body: JSON.stringify({ 
+                    code, 
+                    language,
+                    testCases: testCases.length > 0 ? testCases : undefined
+                })
             })
             const data = await response.json()
 
             if (data.error) {
-                setError(data.error)
+                setError(data.output || data.error || "An error occurred")
+                if (data.type === 'compilation_error') {
+                    setError(`Compilation Error:\n${data.output || data.error}`)
+                } else if (data.type === 'runtime_error') {
+                    setError(`Runtime Error:\n${data.output || data.error}`)
+                }
+            } else if (data.type === 'test_results' && data.results) {
+                // Test case results
+                setTestResults(data)
+                setOutput(`Tests: ${data.passed}/${data.total} passed`)
+                if (data.passed === data.total) {
+                    setError("")
+                } else {
+                    setError("Some test cases failed. Check the Test Results tab.")
+                }
             } else {
+                // Regular execution output
                 setOutput(data.output || "Code executed successfully (no output)")
+                setError("")
             }
         } catch (error) {
             setError("Failed to execute code. Please try again.")
+            console.error("Execution error:", error)
         } finally {
             setIsRunning(false)
         }
@@ -108,9 +153,10 @@ export default function InterviewPage() {
     const handleNextQuestion = () => {
         if (currentQuestion < totalQuestions) {
             setCurrentQuestion(currentQuestion + 1)
-            setCode("// Start coding here...")
+            setCode("# Two Sum Problem\n# Given an array of integers nums and an integer target,\n# return indices of the two numbers such that they add up to target.\n\ndef twoSum(nums, target):\n    # Your code here\n    pass")
             setOutput("")
             setError("")
+            setTestResults(null)
         }
     }
 
@@ -210,6 +256,17 @@ export default function InterviewPage() {
                                                 <Terminal className="h-4 w-4" />
                                                 Output
                                             </TabsTrigger>
+                                            {testResults && (
+                                                <TabsTrigger value="tests" className="gap-2">
+                                                    <CheckCircle2 className="h-4 w-4" />
+                                                    Test Results
+                                                    {testResults.passed === testResults.total ? (
+                                                        <span className="ml-1 flex h-2 w-2 rounded-full bg-green-500" />
+                                                    ) : (
+                                                        <span className="ml-1 flex h-2 w-2 rounded-full bg-yellow-500" />
+                                                    )}
+                                                </TabsTrigger>
+                                            )}
                                             <TabsTrigger value="errors" className="gap-2">
                                                 <AlertCircle className="h-4 w-4" />
                                                 Errors
@@ -229,7 +286,7 @@ export default function InterviewPage() {
                                                         <CheckCircle2 className="h-4 w-4" />
                                                         Execution Successful
                                                     </div>
-                                                    <pre className="text-foreground">{output}</pre>
+                                                    <pre className="text-foreground whitespace-pre-wrap">{output}</pre>
                                                 </div>
                                             ) : (
                                                 <div className="text-muted-foreground italic">
@@ -237,6 +294,76 @@ export default function InterviewPage() {
                                                 </div>
                                             )}
                                         </TabsContent>
+
+                                        {testResults && (
+                                            <TabsContent value="tests" className="flex-1 overflow-auto p-4 m-0">
+                                                <div className="space-y-4">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-2">
+                                                            {testResults.passed === testResults.total ? (
+                                                                <>
+                                                                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                                                                    <span className="font-semibold text-green-600 dark:text-green-400">
+                                                                        All Tests Passed ({testResults.passed}/{testResults.total})
+                                                                    </span>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+                                                                    <span className="font-semibold text-yellow-600 dark:text-yellow-400">
+                                                                        {testResults.passed}/{testResults.total} Tests Passed
+                                                                    </span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-3">
+                                                        {testResults.results.map((result: any, index: number) => (
+                                                            <div
+                                                                key={index}
+                                                                className={`p-3 rounded-md border ${
+                                                                    result.passed
+                                                                        ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
+                                                                        : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center gap-2 mb-2">
+                                                                    {result.passed ? (
+                                                                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                                                    ) : (
+                                                                        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                                                    )}
+                                                                    <span className="font-semibold text-sm">
+                                                                        Test {result.test} {result.passed ? 'Passed' : 'Failed'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="space-y-1 text-xs font-mono">
+                                                                    <div>
+                                                                        <span className="text-muted-foreground">Input: </span>
+                                                                        <span className="text-foreground">{result.input}</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-muted-foreground">Expected: </span>
+                                                                        <span className="text-green-600 dark:text-green-400">{result.expected}</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <span className="text-muted-foreground">Actual: </span>
+                                                                        <span className={result.passed ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
+                                                                            {result.actual}
+                                                                        </span>
+                                                                    </div>
+                                                                    {result.error && (
+                                                                        <div className="text-red-600 dark:text-red-400">
+                                                                            Error: {result.error}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </TabsContent>
+                                        )}
 
                                         <TabsContent value="errors" className="flex-1 overflow-auto p-4 m-0 font-mono text-sm">
                                             {error ? (
