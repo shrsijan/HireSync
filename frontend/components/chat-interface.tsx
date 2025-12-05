@@ -48,14 +48,23 @@ export function ChatInterface({ code, language }: ChatInterfaceProps) {
         setMessages((prev) => [...prev, newMessage])
         setInput("")
 
+        // Create placeholder for streaming response
+        const aiResponseId = (Date.now() + 1).toString()
+        const aiResponse: Message = {
+            id: aiResponseId,
+            role: "assistant",
+            content: "",
+        }
+        setMessages((prev) => [...prev, aiResponse])
+
         try {
-            // Import API_URL dynamically or use hardcoded for now to avoid import issues in this snippet
             const API_URL = "http://localhost:5001/api";
 
-            const response = await fetch(`${API_URL}/ai/chat`, {
+            const response = await fetch(`${API_URL}/ai/chat?stream=true`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream',
                 },
                 body: JSON.stringify({
                     messages: [...messages, newMessage].map(m => ({ role: m.role, content: m.content })),
@@ -64,22 +73,52 @@ export function ChatInterface({ code, language }: ChatInterfaceProps) {
                 }),
             });
 
-            const data = await response.json();
-
-            const aiResponse: Message = {
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                content: data.message.content,
+            if (!response.ok) {
+                throw new Error('Failed to get response')
             }
-            setMessages((prev) => [...prev, aiResponse])
+
+            const reader = response.body?.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+
+            if (reader) {
+                while (true) {
+                    const { done, value } = await reader.read()
+                    if (done) break
+
+                    buffer += decoder.decode(value, { stream: true })
+                    const lines = buffer.split('\n')
+                    buffer = lines.pop() || ''
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6))
+                                if (data.content) {
+                                    setMessages((prev) => 
+                                        prev.map((msg) => 
+                                            msg.id === aiResponseId 
+                                                ? { ...msg, content: msg.content + data.content }
+                                                : msg
+                                        )
+                                    )
+                                }
+                            } catch (e) {
+                                // Ignore parse errors
+                            }
+                        }
+                    }
+                }
+            }
         } catch (error) {
             console.error("Error sending message:", error);
-            const errorResponse: Message = {
-                id: (Date.now() + 1).toString(),
-                role: "assistant",
-                content: "Sorry, I encountered an error processing your request.",
-            }
-            setMessages((prev) => [...prev, errorResponse])
+            setMessages((prev) => 
+                prev.map((msg) => 
+                    msg.id === aiResponseId 
+                        ? { ...msg, content: "Sorry, I encountered an error processing your request." }
+                        : msg
+                )
+            )
         }
     }
 

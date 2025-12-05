@@ -5,32 +5,53 @@ const ollama = new Ollama({ host: 'http://127.0.0.1:11434' });
 exports.chat = async (req, res) => {
     try {
         const { messages, code } = req.body;
+        const stream = req.query.stream === 'true' || req.headers.accept === 'text/event-stream';
 
-        // Construct the system prompt
-        const systemPrompt = `You are an expert technical interviewer. 
-    The candidate is writing code in ${req.body.language || 'javascript'}.
-    Here is their current code:
-    \`\`\`
-    ${code}
-    \`\`\`
-    Analyze the code and the user's latest message. 
-    Provide feedback, ask follow-up questions, or guide them if they are stuck.
-    Be professional but encouraging.
-    IMPORTANT: Format your response using bullet points for clarity and readability. Keep answers concise.`;
+        // Optimized system prompt - shorter and more focused
+        const systemPrompt = `You are a technical interviewer. Candidate is coding in ${req.body.language || 'javascript'}. 
+Code:
+\`\`\`${code}\`\`\`
+Provide concise feedback, ask questions, or guide them. Use bullet points. Be professional and encouraging.`;
 
         const chatMessages = [
             { role: 'system', content: systemPrompt },
             ...messages
         ];
 
-        const response = await ollama.chat({
-            model: 'llama3.2', // Or whatever model the user has
-            messages: chatMessages,
-        });
+        if (stream) {
+            // Set headers for Server-Sent Events (SSE)
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
 
-        res.json({ message: response.message });
+            const streamResponse = await ollama.chat({
+                model: 'llama3.2',
+                messages: chatMessages,
+                stream: true,
+            });
+
+            for await (const chunk of streamResponse) {
+                if (chunk.message?.content) {
+                    res.write(`data: ${JSON.stringify({ content: chunk.message.content, done: false })}\n\n`);
+                }
+            }
+            res.write(`data: ${JSON.stringify({ content: '', done: true })}\n\n`);
+            res.end();
+        } else {
+            // Non-streaming fallback
+            const response = await ollama.chat({
+                model: 'llama3.2',
+                messages: chatMessages,
+                options: {
+                    temperature: 0.7,
+                    num_predict: 200, // Limit response length for faster responses
+                }
+            });
+
+            res.json({ message: response.message });
+        }
     } catch (err) {
-        console.error(err);
+        console.error('AI Error:', err);
         res.status(500).send('AI Error');
     }
 };
