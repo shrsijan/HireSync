@@ -5,7 +5,10 @@ import { useSession } from "next-auth/react"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
-import { ArrowRight, Calendar, Clock, Building2, TrendingUp, Award, CheckCircle2 } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { ArrowRight, Calendar, Clock, Building2, TrendingUp, Award, CheckCircle2, Plus, X, Loader2 } from "lucide-react"
 
 interface Invitation {
     _id: string
@@ -22,6 +25,7 @@ interface Invitation {
 
 export default function CandidateDashboard() {
     const { data: session } = useSession()
+    const router = useRouter()
     const [invitations, setInvitations] = useState<Invitation[]>([])
     const [loading, setLoading] = useState(true)
     const [stats, setStats] = useState({
@@ -31,8 +35,17 @@ export default function CandidateDashboard() {
         upcoming: 0
     })
 
+    // Modal State
+    const [showAssessmentModal, setShowAssessmentModal] = useState(false)
+    const [assessmentCode, setAssessmentCode] = useState("")
+    const [verifying, setVerifying] = useState(false)
+    const [error, setError] = useState("")
+
     useEffect(() => {
-        fetchInvitations()
+        if (session) {
+            // fetchInvitations() // Disabled per user request (manual entry only)
+            setLoading(false);
+        }
     }, [session])
 
     const fetchInvitations = async () => {
@@ -41,67 +54,77 @@ export default function CandidateDashboard() {
             const token = session?.user?.accessToken || ""
             const email = session?.user?.email || ""
 
-            const res = await fetch(`http://localhost:5001/api/invitations/candidate/${email}`, {
+            // Ensure absolute URL if running server-side or if proxy not set
+            // Ideally use config
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
+
+            const res = await fetch(`${API_URL}/invitations/candidate/${email}`, {
                 headers: {
                     "Authorization": `Bearer ${token}`
                 }
             })
 
-            if (res.ok) {
-                const data = await res.json()
-                setInvitations(data)
+            const contentType = res.headers.get("content-type");
+            if (contentType && contentType.indexOf("application/json") !== -1) {
+                if (res.ok) {
+                    const data = await res.json()
+                    setInvitations(data)
 
-                // Calculate stats
-                const pending = data.filter((inv: Invitation) => inv.status === 'pending').length
-                const completed = data.filter((inv: Invitation) => inv.status === 'completed').length
-                const upcoming = pending
+                    // Calculate stats
+                    const pending = data.filter((inv: Invitation) => inv.status === 'pending').length
+                    const completed = data.filter((inv: Invitation) => inv.status === 'completed').length
+                    const upcoming = pending
 
-                setStats({
-                    total: data.length,
-                    pending,
-                    completed,
-                    upcoming
-                })
+                    setStats({
+                        total: data.length,
+                        pending,
+                        completed,
+                        upcoming
+                    })
+                } else {
+                    console.error("Failed to fetch invitations", await res.text())
+                    // Keep empty or show error state
+                }
             } else {
-                // Fallback to mock data if API fails
-                setInvitations([
-                    {
-                        _id: "1",
-                        companyName: "Tech Corp",
-                        role: "Software Engineer",
-                        status: "pending",
-                        title: "Technical Assessment",
-                        assessment: {
-                            timeLimit: 60,
-                            expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-                        },
-                        createdAt: new Date().toISOString()
-                    }
-                ])
-                setStats({ total: 1, pending: 1, completed: 0, upcoming: 1 })
+                console.error("Received non-JSON response from API", await res.text())
             }
+
         } catch (err) {
             console.error("Error fetching invitations:", err)
-            // Use mock data on error
-            setInvitations([
-                {
-                    _id: "1",
-                    companyName: "Tech Corp",
-                    role: "Software Engineer",
-                    status: "pending",
-                    title: "Technical Assessment",
-                    assessment: {
-                        timeLimit: 60,
-                        expiryDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-                    },
-                    createdAt: new Date().toISOString()
-                }
-            ])
-            setStats({ total: 1, pending: 1, completed: 0, upcoming: 1 })
         } finally {
             setLoading(false)
         }
     }
+
+    const handleVerifyCode = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setVerifying(true);
+        setError("");
+
+        try {
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
+
+            const res = await fetch(`${API_URL}/invitations/validate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: assessmentCode })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.msg || "Invalid code");
+            }
+
+            // If valid, redirect to interview page with token
+            router.push(`/interview/${assessmentCode}`);
+
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setVerifying(false);
+        }
+    };
 
     const getStatusColor = (status: string) => {
         switch (status.toLowerCase()) {
@@ -136,15 +159,26 @@ export default function CandidateDashboard() {
     }
 
     return (
-        <div className="container mx-auto p-6 space-y-8">
+        <div className="container mx-auto p-6 space-y-8 relative">
             {/* Welcome Header */}
-            <div className="flex flex-col gap-2">
-                <h1 className="text-4xl font-bold tracking-tight">
-                    Welcome back, {session?.user?.name?.split(' ')[0] || 'Candidate'}!
-                </h1>
-                <p className="text-muted-foreground text-lg">
-                    Track your interview invitations and start your technical assessments
-                </p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex flex-col gap-2">
+                    <h1 className="text-4xl font-bold tracking-tight">
+                        Welcome back, {session?.user?.name?.split(' ')[0] || 'Candidate'}!
+                    </h1>
+                    <p className="text-muted-foreground text-lg">
+                        Track your interview invitations and start your technical assessments
+                    </p>
+                </div>
+                {/* New Assessment Button */}
+                <Button
+                    onClick={() => setShowAssessmentModal(true)}
+                    className="gap-2 shadow-lg hover:shadow-xl transition-all"
+                    size="lg"
+                >
+                    <Plus className="h-5 w-5" />
+                    New Assessment
+                </Button>
             </div>
 
             {/* Stats Cards */}
@@ -275,6 +309,69 @@ export default function CandidateDashboard() {
                     </div>
                 )}
             </div>
+
+            {/* Assessment Code Modal */}
+            {showAssessmentModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl shadow-2xl w-full max-w-md p-6 m-4 relative animate-in zoom-in-95 duration-200 border border-gray-100">
+                        <button
+                            onClick={() => setShowAssessmentModal(false)}
+                            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 transition-colors"
+                            disabled={verifying}
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                                Enter Assessment Code
+                            </h2>
+                            <p className="text-gray-500 mt-2">
+                                Enter the unique code provided by your recruiter to access the assessment.
+                            </p>
+                        </div>
+
+                        <form onSubmit={handleVerifyCode} className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="code">Assessment Code</Label>
+                                <Input
+                                    id="code"
+                                    placeholder="e.g. 8f3a2..."
+                                    value={assessmentCode}
+                                    onChange={(e) => setAssessmentCode(e.target.value)}
+                                    className="text-lg tracking-wide font-mono"
+                                    required
+                                    disabled={verifying}
+                                />
+                            </div>
+
+                            {error && (
+                                <div className="p-3 bg-red-50 text-red-600 text-sm rounded-md flex items-center gap-2">
+                                    <svg className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                    </svg>
+                                    {error}
+                                </div>
+                            )}
+
+                            <Button
+                                type="submit"
+                                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold h-11"
+                                disabled={verifying || !assessmentCode}
+                            >
+                                {verifying ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Verifying...
+                                    </>
+                                ) : (
+                                    "Start Assessment"
+                                )}
+                            </Button>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

@@ -52,7 +52,7 @@ export function ChatInterface({ code, language, accessToken }: ChatInterfaceProp
     setSending(true)
 
     try {
-      const res = await fetch(`${API_URL}/ai/chat`, {
+      const res = await fetch(`${API_URL}/ai/gemini-chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

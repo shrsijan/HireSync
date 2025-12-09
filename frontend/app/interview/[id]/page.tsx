@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import { CodeEditor } from "@/components/code-editor"
 import { ChatInterface } from "@/components/chat-interface"
 import {
@@ -13,52 +13,87 @@ import { Button } from "@/components/ui/button"
 import { Clock, Building2, AlertCircle, CheckCircle2, Terminal, AlertTriangle } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
-export default function InterviewPage() {
+export default function InterviewPage({ params }: { params: { id: string } }) {
     const router = useRouter()
-    const [code, setCode] = useState("# Two Sum Problem\n# Given an array of integers nums and an integer target,\n# return indices of the two numbers such that they add up to target.\n\ndef twoSum(nums, target):\n    # Your code here\n    pass")
+    // Resolving params in Next.js 15+ if needed, but for 14 it's direct. Assuming typical Next 14 usage.
+    // If params is a promise in newer Next.js versions, we might need `use(params)` or `await params`. 
+    // Given the previous file content didn't use params, I'll assume standard usage.
+
+    // In Next.js 13+ app dir, params are passed as props.
+    // However, since this is a client component ("use client"), we might need `useParams` from next/navigation 
+    // if we want to be safe, or just use the props. `useParams` is often easier in client components.
+
+    // Let's use useParams to be safe and consistent with "use client"
+    // But wait, the component signature was `export default function InterviewPage()`.
+
+    // I will use useParams from next/navigation.
+
+    const { id: inviteCode } = useParams() // Requires import
+
+    const [code, setCode] = useState("# Loading assessment...")
     const [language, setLanguage] = useState("python")
     const [output, setOutput] = useState("")
     const [error, setError] = useState("")
     const [isRunning, setIsRunning] = useState(false)
     const [testResults, setTestResults] = useState<any>(null)
-    const [timeLeft, setTimeLeft] = useState(3600) // 60 minutes in seconds
+    const [timeLeft, setTimeLeft] = useState(0)
     const [currentQuestion, setCurrentQuestion] = useState(1)
-    const [totalQuestions, setTotalQuestions] = useState(3)
+    const [totalQuestions, setTotalQuestions] = useState(0)
+    const [isLoading, setIsLoading] = useState(true)
 
-    // Mock assessment data - in real app, fetch from API
-    const [assessment, setAssessment] = useState({
-        companyName: "Tech Corp",
-        role: "Software Engineer",
-        title: "Technical Assessment",
-        question: {
-            title: "Two Sum Problem",
-            description: "Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.\n\nExample:\nInput: nums = [2,7,11,15], target = 9\nOutput: [0,1]\nExplanation: Because nums[0] + nums[1] == 9, we return [0, 1].",
-            difficulty: "Medium",
-            testCases: [
-                {
-                    input: "twoSum([2, 7, 11, 15], 9)",
-                    expected: "[0, 1]",
-                    type: "function_call",
-                    description: "Example case: nums = [2,7,11,15], target = 9"
-                },
-                {
-                    input: "twoSum([3, 2, 4], 6)",
-                    expected: "[1, 2]",
-                    type: "function_call",
-                    description: "Test case: nums = [3,2,4], target = 6"
-                },
-                {
-                    input: "twoSum([3, 3], 6)",
-                    expected: "[0, 1]",
-                    type: "function_call",
-                    description: "Test case with duplicate numbers: nums = [3,3], target = 6"
+    const [assessment, setAssessment] = useState<any>(null)
+
+    useEffect(() => {
+        const fetchAssessment = async () => {
+            if (!inviteCode) return;
+
+            try {
+                // Determine API URL (using localhost for now as in other files, or relative if proxied)
+                // Using http://localhost:5001/api based on config
+                const API_URL = "http://localhost:5001/api";
+
+                const res = await fetch(`${API_URL}/invitations/validate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: inviteCode })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.msg || "Failed to load assessment");
                 }
-            ]
-        }
-    })
+
+                const data = await res.json();
+                setAssessment(data.assessment);
+                setTotalQuestions(data.assessment.questions.length);
+                setTimeLeft(data.assessment.timeLimit * 60);
+
+                // Initialize with first question if available
+                if (data.assessment.questions.length > 0) {
+                    // Set initial code template if we had one per language, strictly speaking 
+                    // users might want a blank slate or template.
+                    // For now, setting a generic template.
+                    setCode(`# ${data.assessment.questions[0].title}\n# ${data.assessment.questions[0].description}\n\ndef solution():\n    pass`)
+                } else {
+                    setCode("# No questions found in this assessment.")
+                }
+
+            } catch (err: any) {
+                console.error(err);
+                alert(err.message || "Error loading assessment");
+                router.push("/");
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchAssessment();
+    }, [inviteCode, router]);
 
     // Timer effect
     useEffect(() => {
+        if (!assessment || isLoading) return;
+
         const timer = setInterval(() => {
             setTimeLeft((prev) => {
                 if (prev <= 0) {
@@ -71,7 +106,7 @@ export default function InterviewPage() {
         }, 1000)
 
         return () => clearInterval(timer)
-    }, [])
+    }, [assessment, isLoading])
 
     // Format time as MM:SS
     const formatTime = (seconds: number) => {
@@ -101,12 +136,12 @@ export default function InterviewPage() {
         try {
             const API_URL = "http://localhost:5001/api"
             const testCases = assessment.question.testCases || []
-            
+
             const response = await fetch(`${API_URL}/execute`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    code, 
+                body: JSON.stringify({
+                    code,
                     language,
                     testCases: testCases.length > 0 ? testCases : undefined
                 })
@@ -160,6 +195,17 @@ export default function InterviewPage() {
         }
     }
 
+    if (isLoading || !assessment) {
+        return (
+            <div className="h-screen w-full flex items-center justify-center bg-background">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground">Loading assessment...</p>
+                </div>
+            </div>
+        )
+    }
+
     return (
         <div className="h-screen w-full flex flex-col bg-background">
             {/* Assessment Header */}
@@ -204,19 +250,31 @@ export default function InterviewPage() {
                             {/* Question Panel */}
                             <ResizablePanel defaultSize={35} minSize={25}>
                                 <div className="h-full overflow-auto p-6 bg-muted/30">
-                                    <div className="space-y-4">
-                                        <div className="flex items-center justify-between">
-                                            <h2 className="text-2xl font-bold">{assessment.question.title}</h2>
-                                            <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                                {assessment.question.difficulty}
-                                            </span>
+                                    {isLoading ? (
+                                        <div className="flex h-full items-center justify-center">
+                                            <div className="text-center">
+                                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                                                <p>Loading assessment...</p>
+                                            </div>
                                         </div>
-                                        <div className="prose dark:prose-invert max-w-none">
-                                            <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
-                                                {assessment.question.description}
-                                            </p>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <h2 className="text-2xl font-bold">{assessment.questions[currentQuestion - 1]?.title}</h2>
+                                                <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                                    {assessment.questions[currentQuestion - 1]?.difficulty || 'Medium'}
+                                                </span>
+                                            </div>
+                                            <div className="prose dark:prose-invert max-w-none">
+                                                <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
+                                                    {assessment.questions[currentQuestion - 1]?.description}
+                                                </p>
+                                                {assessment.questions[currentQuestion - 1]?.image && (
+                                                    <img src={assessment.questions[currentQuestion - 1].image} alt="Question Diagram" className="mt-4 rounded-lg border shadow-sm" />
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             </ResizablePanel>
 
@@ -237,153 +295,9 @@ export default function InterviewPage() {
 
                     <ResizableHandle withHandle />
 
-                    {/* Right: Chat + Output */}
+                    {/* Right: Chat Only (Whiteboard Style) */}
                     <ResizablePanel defaultSize={40} minSize={30}>
-                        <ResizablePanelGroup direction="vertical">
-                            {/* Chat Interface */}
-                            <ResizablePanel defaultSize={60} minSize={40}>
-                                <ChatInterface code={code} language={language} />
-                            </ResizablePanel>
-
-                            <ResizableHandle withHandle />
-
-                            {/* Output Panel */}
-                            <ResizablePanel defaultSize={40} minSize={20}>
-                                <div className="h-full bg-background border-t">
-                                    <Tabs defaultValue="output" className="h-full flex flex-col">
-                                        <TabsList className="w-full justify-start rounded-none border-b bg-muted/50">
-                                            <TabsTrigger value="output" className="gap-2">
-                                                <Terminal className="h-4 w-4" />
-                                                Output
-                                            </TabsTrigger>
-                                            {testResults && (
-                                                <TabsTrigger value="tests" className="gap-2">
-                                                    <CheckCircle2 className="h-4 w-4" />
-                                                    Test Results
-                                                    {testResults.passed === testResults.total ? (
-                                                        <span className="ml-1 flex h-2 w-2 rounded-full bg-green-500" />
-                                                    ) : (
-                                                        <span className="ml-1 flex h-2 w-2 rounded-full bg-yellow-500" />
-                                                    )}
-                                                </TabsTrigger>
-                                            )}
-                                            <TabsTrigger value="errors" className="gap-2">
-                                                <AlertCircle className="h-4 w-4" />
-                                                Errors
-                                                {error && <span className="ml-1 flex h-2 w-2 rounded-full bg-red-500" />}
-                                            </TabsTrigger>
-                                        </TabsList>
-
-                                        <TabsContent value="output" className="flex-1 overflow-auto p-4 m-0 font-mono text-sm">
-                                            {isRunning ? (
-                                                <div className="flex items-center gap-2 text-muted-foreground">
-                                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                                                    Running code...
-                                                </div>
-                                            ) : output ? (
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-xs font-semibold">
-                                                        <CheckCircle2 className="h-4 w-4" />
-                                                        Execution Successful
-                                                    </div>
-                                                    <pre className="text-foreground whitespace-pre-wrap">{output}</pre>
-                                                </div>
-                                            ) : (
-                                                <div className="text-muted-foreground italic">
-                                                    No output yet. Run your code to see results.
-                                                </div>
-                                            )}
-                                        </TabsContent>
-
-                                        {testResults && (
-                                            <TabsContent value="tests" className="flex-1 overflow-auto p-4 m-0">
-                                                <div className="space-y-4">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex items-center gap-2">
-                                                            {testResults.passed === testResults.total ? (
-                                                                <>
-                                                                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
-                                                                    <span className="font-semibold text-green-600 dark:text-green-400">
-                                                                        All Tests Passed ({testResults.passed}/{testResults.total})
-                                                                    </span>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
-                                                                    <span className="font-semibold text-yellow-600 dark:text-yellow-400">
-                                                                        {testResults.passed}/{testResults.total} Tests Passed
-                                                                    </span>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="space-y-3">
-                                                        {testResults.results.map((result: any, index: number) => (
-                                                            <div
-                                                                key={index}
-                                                                className={`p-3 rounded-md border ${
-                                                                    result.passed
-                                                                        ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'
-                                                                        : 'bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800'
-                                                                }`}
-                                                            >
-                                                                <div className="flex items-center gap-2 mb-2">
-                                                                    {result.passed ? (
-                                                                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                                                                    ) : (
-                                                                        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                                                                    )}
-                                                                    <span className="font-semibold text-sm">
-                                                                        Test {result.test} {result.passed ? 'Passed' : 'Failed'}
-                                                                    </span>
-                                                                </div>
-                                                                <div className="space-y-1 text-xs font-mono">
-                                                                    <div>
-                                                                        <span className="text-muted-foreground">Input: </span>
-                                                                        <span className="text-foreground">{result.input}</span>
-                                                                    </div>
-                                                                    <div>
-                                                                        <span className="text-muted-foreground">Expected: </span>
-                                                                        <span className="text-green-600 dark:text-green-400">{result.expected}</span>
-                                                                    </div>
-                                                                    <div>
-                                                                        <span className="text-muted-foreground">Actual: </span>
-                                                                        <span className={result.passed ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
-                                                                            {result.actual}
-                                                                        </span>
-                                                                    </div>
-                                                                    {result.error && (
-                                                                        <div className="text-red-600 dark:text-red-400">
-                                                                            Error: {result.error}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </TabsContent>
-                                        )}
-
-                                        <TabsContent value="errors" className="flex-1 overflow-auto p-4 m-0 font-mono text-sm">
-                                            {error ? (
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-semibold">
-                                                        <AlertTriangle className="h-4 w-4" />
-                                                        Execution Error
-                                                    </div>
-                                                    <pre className="text-red-600 dark:text-red-400 whitespace-pre-wrap">{error}</pre>
-                                                </div>
-                                            ) : (
-                                                <div className="text-muted-foreground italic">
-                                                    No errors
-                                                </div>
-                                            )}
-                                        </TabsContent>
-                                    </Tabs>
-                                </div>
-                            </ResizablePanel>
-                        </ResizablePanelGroup>
+                        <ChatInterface code={code} language={language} />
                     </ResizablePanel>
                 </ResizablePanelGroup>
             </div>

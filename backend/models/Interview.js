@@ -20,7 +20,21 @@ const interviewSchema = new mongoose.Schema({
     userId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
+        required: false // Optional for invited candidates
+    },
+    assessmentId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Assessment',
+        required: false
+    },
+    invitationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Invitation',
+        required: false
+    },
+    candidateEmail: {
+        type: String, // For invited candidates without account
+        required: false
     },
     type: {
         type: String,

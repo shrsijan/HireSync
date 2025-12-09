@@ -25,6 +25,9 @@ interface Assessment {
     expiryDate: string
 }
 
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+
 export default function RecruiterDashboard() {
     const { data: session } = useSession()
     const [assessments, setAssessments] = useState<Assessment[]>([])
@@ -36,9 +39,17 @@ export default function RecruiterDashboard() {
         expiryDate: ""
     })
     const [questions, setQuestions] = useState<Question[]>([])
-    const [inviteEmail, setInviteEmail] = useState("")
     const [selectedAssessment, setSelectedAssessment] = useState<string | null>(null)
-    const [inviteStatus, setInviteStatus] = useState<string>("")
+
+    // Manual Invite State
+    const [inviteEmail, setInviteEmail] = useState("")
+    const [showInviteModal, setShowInviteModal] = useState(false) // Toggle invite section
+    const [activeTab, setActiveTab] = useState("manual")
+
+    // Bulk Invite State
+    const [bulkFile, setBulkFile] = useState<File | null>(null)
+    const [uploadStatus, setUploadStatus] = useState("")
+    const [generatedInvites, setGeneratedInvites] = useState<any[]>([])
 
     useEffect(() => {
         fetchAssessments()
@@ -133,9 +144,9 @@ export default function RecruiterDashboard() {
         }
     }
 
-    const handleInvite = async (assessmentId: string) => {
+    const handleManualInvite = async () => {
+        if (!selectedAssessment) return;
         try {
-            setInviteStatus("Sending...")
             // @ts-ignore
             const token = session?.user?.accessToken || ""
             const res = await fetch("http://localhost:5001/api/invitations", {
@@ -145,22 +156,57 @@ export default function RecruiterDashboard() {
                     "Authorization": `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    assessmentId,
+                    assessmentId: selectedAssessment,
                     email: inviteEmail
                 })
             })
 
             if (res.ok) {
                 const data = await res.json()
-                setInviteStatus(`Sent! Preview: ${data.previewUrl}`)
+                // Append to generated invites list for consistency
+                setGeneratedInvites(prev => [{
+                    email: inviteEmail,
+                    token: data.token,
+                    firstName: "-",
+                    lastName: "-"
+                }, ...prev])
                 setInviteEmail("")
-                setTimeout(() => setInviteStatus(""), 10000) // Clear after 10s
-            } else {
-                setInviteStatus("Failed to send")
             }
         } catch (err) {
             console.error(err)
-            setInviteStatus("Error sending invite")
+        }
+    }
+
+    const handleBulkUpload = async () => {
+        if (!selectedAssessment || !bulkFile) return;
+
+        try {
+            setUploadStatus("Uploading...")
+            const formData = new FormData()
+            formData.append('file', bulkFile)
+            formData.append('assessmentId', selectedAssessment)
+
+            // @ts-ignore
+            const token = session?.user?.accessToken || ""
+            const res = await fetch("http://localhost:5001/api/invitations/bulk", {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                },
+                body: formData
+            })
+
+            if (res.ok) {
+                const data = await res.json()
+                setGeneratedInvites(prev => [...data.invitations, ...prev])
+                setUploadStatus(`Success! Generated ${data.count} codes.`)
+                setBulkFile(null)
+            } else {
+                setUploadStatus("Upload failed")
+            }
+        } catch (err) {
+            console.error(err)
+            setUploadStatus("Error uploading file")
         }
     }
 
@@ -287,50 +333,111 @@ export default function RecruiterDashboard() {
                 </Card>
             )}
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-8">
                 {assessments.length === 0 ? (
                     <p className="text-muted-foreground col-span-full text-center py-10">
                         No assessments created yet. Click "Create Assessment" to get started.
                     </p>
                 ) : (
                     assessments.map((assessment) => (
-                        <Card key={assessment._id}>
+                        <Card
+                            key={assessment._id}
+                            className={`cursor-pointer transition-all ${selectedAssessment === assessment._id ? 'border-primary ring-2 ring-primary/20' : ''}`}
+                            onClick={() => {
+                                setSelectedAssessment(assessment._id)
+                                setShowInviteModal(true)
+                                setGeneratedInvites([]) // Clear previous session results
+                            }}
+                        >
                             <CardHeader>
                                 <CardTitle>{assessment.title}</CardTitle>
                                 <CardDescription>{assessment.role}</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="space-y-4">
-                                    <div className="text-sm">
-                                        <p>Time Limit: {assessment.timeLimit} mins</p>
-                                        <p>Expires: {new Date(assessment.expiryDate).toLocaleDateString()}</p>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <div className="flex gap-2">
-                                            <Input
-                                                placeholder="Candidate Email"
-                                                value={selectedAssessment === assessment._id ? inviteEmail : ""}
-                                                onChange={(e) => {
-                                                    setSelectedAssessment(assessment._id)
-                                                    setInviteEmail(e.target.value)
-                                                    setInviteStatus("")
-                                                }}
-                                            />
-                                            <Button size="icon" onClick={() => handleInvite(assessment._id)}>
-                                                <Send className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                        {selectedAssessment === assessment._id && inviteStatus && (
-                                            <p className="text-xs text-muted-foreground break-all">{inviteStatus}</p>
-                                        )}
-                                    </div>
+                                <div className="text-sm">
+                                    <p>Time Limit: {assessment.timeLimit} mins</p>
+                                    <p>Expires: {new Date(assessment.expiryDate).toLocaleDateString()}</p>
                                 </div>
                             </CardContent>
                         </Card>
                     ))
                 )}
             </div>
+
+            {/* Invite Generation Section */}
+            {selectedAssessment && showInviteModal && (
+                <Card className="mb-8 border-2">
+                    <CardHeader>
+                        <CardTitle>Generate Invitations</CardTitle>
+                        <CardDescription>Select an assessment above and choose a method to generate access codes.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <Tabs defaultValue="manual" className="w-full">
+                            <TabsList className="grid w-full grid-cols-2 mb-4">
+                                <TabsTrigger value="manual">Manual Entry</TabsTrigger>
+                                <TabsTrigger value="bulk">Bulk Upload (CSV)</TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="manual" className="space-y-4">
+                                <div className="flex gap-2">
+                                    <Input
+                                        placeholder="Candidate Email"
+                                        value={inviteEmail}
+                                        onChange={(e) => setInviteEmail(e.target.value)}
+                                    />
+                                    <Button onClick={handleManualInvite} disabled={!inviteEmail}>
+                                        <Plus className="mr-2 h-4 w-4" /> Generate Code
+                                    </Button>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="bulk" className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label>Upload CSV (FirstName, LastName, Email)</Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="file"
+                                            accept=".csv"
+                                            onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
+                                        />
+                                        <Button onClick={handleBulkUpload} disabled={!bulkFile}>
+                                            Upload & Generate
+                                        </Button>
+                                    </div>
+                                    {uploadStatus && <p className="text-sm text-muted-foreground">{uploadStatus}</p>}
+                                </div>
+                            </TabsContent>
+                        </Tabs>
+
+                        {/* Results Table */}
+                        {generatedInvites.length > 0 && (
+                            <div className="mt-8">
+                                <h3 className="text-lg font-semibold mb-4">Generated Access Codes</h3>
+                                <div className="border rounded-md">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Email</TableHead>
+                                                <TableHead>Name</TableHead>
+                                                <TableHead>Access Code</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {generatedInvites.map((invite, i) => (
+                                                <TableRow key={i}>
+                                                    <TableCell>{invite.email}</TableCell>
+                                                    <TableCell>{invite.firstName} {invite.lastName}</TableCell>
+                                                    <TableCell className="font-mono font-bold text-primary">{invite.token}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            )}
         </div>
     )
 }

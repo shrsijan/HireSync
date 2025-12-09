@@ -11,6 +11,14 @@ const InvitationSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    firstName: {
+        type: String,
+        required: false // Optional for now to support legacy
+    },
+    lastName: {
+        type: String,
+        required: false
+    },
     email: {
         type: String,
         required: true
