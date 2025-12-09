@@ -4,62 +4,58 @@ import Link from "next/link"
 import Image from "next/image"
 import { useSession, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
-import Logo from "@/public/logo.svg";
-import { useEffect, useState } from "react"
 
 export function Navbar() {
-    const { data: session } = useSession()
-    const [mounted, setMounted] = useState(false)
+  const { data: session, status } = useSession()
 
-    useEffect(() => {
-        setMounted(true)
-    }, [])
+  return (
+    <nav className="border-b">
+      <div className="container mx-auto flex h-16 items-center px-10">
+        <Link href="/" className="mr-6" aria-label="Hiresync home">
+          <Image
+            src="/logo.svg"
+            alt="Hiresync"
+            width={120}
+            height={28}
+            sizes="120px"
+            priority
+          />
+        </Link>
 
-    return (
-        <nav className="border-b">
-            <div className="flex h-16 items-center px-10 container mx-auto">
-                <Link href="/" className="mr-6">
-                    <Image src={Logo} alt="Logo" width={300} height={300} />
-                </Link>
+        {status === "authenticated" && (
+          <div className="mx-6 flex items-center space-x-4 lg:space-x-6">
+            <Link
+              href="/dashboard"
+              className="text-sm font-medium transition-colors hover:text-primary"
+            >
+              Dashboard
+            </Link>
+          </div>
+        )}
 
-                {mounted && session && (
-                    <div className="flex items-center space-x-4 lg:space-x-6 mx-6">
-                        <Link
-                            href="/dashboard"
-                            className="text-sm font-medium transition-colors hover:text-primary"
-                        >
-                            Dashboard
-                        </Link>
-                    </div>
-                )}
-                <div className="ml-auto flex items-center space-x-4">
-                    {!mounted ? (
-                        // Render placeholder during SSR to avoid hydration mismatch
-                        <div className="w-32 h-9" />
-                    ) : session ? (
-                        <Button
-                            variant="ghost"
-                            onClick={() => signOut({ callbackUrl: "/" })}
-                            className="text-sm font-medium"
-                        >
-                            Logout
-                        </Button>
-                    ) : (
-                        <>
-                            <Link href="/login">
-                                <Button variant="ghost" className="text-sm font-medium">
-                                    Login
-                                </Button>
-                            </Link>
-                            <Link href="/signup">
-                                <Button className="text-sm font-medium">
-                                    Sign Up
-                                </Button>
-                            </Link>
-                        </>
-                    )}
-                </div>
-            </div>
-        </nav>
-    )
+        <div className="ml-auto flex items-center space-x-4">
+          {status === "loading" ? (
+            <div className="h-9 w-32" />
+          ) : session ? (
+            <Button
+              variant="ghost"
+              className="text-sm font-medium"
+              onClick={() => signOut({ callbackUrl: "/" })}
+            >
+              Logout
+            </Button>
+          ) : (
+            <>
+              <Button asChild variant="ghost" className="text-sm font-medium">
+                <Link href="/login">Login</Link>
+              </Button>
+              <Button asChild className="text-sm font-medium">
+                <Link href="/signup">Sign Up</Link>
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </nav>
+  )
 }
