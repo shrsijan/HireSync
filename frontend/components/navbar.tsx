@@ -11,9 +11,9 @@ export function Navbar() {
 
   return (
     <nav className="border-b">
-      <div className="container mx-auto flex h-24 items-center px-10">
+      <div className="container mx-auto relative flex h-24 items-center px-10">
 
-        {/* Logo */}
+        {/* Logo (left) */}
         <Link
           href="/"
           className="mr-8 flex items-center"
@@ -22,11 +22,21 @@ export function Navbar() {
           <Image
             src="/logo.svg"
             alt="Hiresync"
-            width={320}    // ⬅️ Increased size further
-            height={110}
+            width={350}
+            height={150}
             priority
           />
         </Link>
+
+        {/* Dashboard (true center) */}
+        <div className="absolute left-1/2 -translate-x-1/2">
+          <Link
+            href="/dashboard"
+            className="text-xl font-semibold hover:underline"
+          >
+            Dashboard
+          </Link>
+        </div>
 
         {/* Right side (Login / Logout) */}
         <div className="ml-auto flex items-center space-x-6">
@@ -35,7 +45,7 @@ export function Navbar() {
           ) : session ? (
             <Button
               variant="ghost"
-              className="text-lg font-bold mt-1.5"   // ⬅️ Lowered slightly
+              className="text-lg font-bold mt-1.5"
               onClick={() => signOut({ callbackUrl: "/" })}
             >
               Logout
@@ -45,14 +55,14 @@ export function Navbar() {
               <Button
                 asChild
                 variant="ghost"
-                className="text-base font-medium mt-1.5"  // ⬅️ lowered to match logo alignment
+                className="text-base font-medium mt-1.5"
               >
                 <Link href="/login">Login</Link>
               </Button>
 
               <Button
                 asChild
-                className="text-base font-medium mt-1.5"  // ⬅️ lowered
+                className="text-base font-medium mt-1.5"
               >
                 <Link href="/signup">Sign Up</Link>
               </Button>
