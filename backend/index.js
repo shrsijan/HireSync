@@ -24,6 +24,7 @@ app.use('/api/ai', require('./routes/ai'));
 app.use('/api/execute', require('./routes/execution'));
 app.use('/api/assessments', require('./routes/assessment'));
 app.use('/api/invitations', require('./routes/invitation'));
+app.use('/api/interviews', require('./routes/interview'));
 app.use('/uploads', express.static('uploads'));
 
 const PORT = process.env.PORT || 5001;

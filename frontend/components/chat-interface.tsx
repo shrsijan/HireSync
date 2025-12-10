@@ -16,26 +16,34 @@ interface Message {
 interface ChatInterfaceProps {
   code?: string
   language?: string
-  accessToken?: string // optional token if you want to auth this call
+  consoleOutput?: string
+  executionError?: string
+  testResults?: any
+  accessToken?: string
+  messages: Message[]
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
 }
 
-export function ChatInterface({ code, language, accessToken }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "intro",
-      role: "assistant",
-      content: "Hello! I'm your AI interviewer. Ready to start the technical interview?",
-    },
-  ])
+export function ChatInterface({
+  code,
+  language,
+  consoleOutput,
+  executionError,
+  testResults,
+  accessToken,
+  messages,
+  setMessages
+}: ChatInterfaceProps) {
   const [input, setInput] = useState("")
   const [sending, setSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    console.log("[ChatInterface] Props received:", { codeLength: code?.length, language, hasOutput: !!consoleOutput });
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [messages])
+  }, [messages, code, language, consoleOutput])
 
   const handleSend = async () => {
     const text = input.trim()
@@ -62,6 +70,9 @@ export function ChatInterface({ code, language, accessToken }: ChatInterfaceProp
           messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
           code: code ?? "",
           language: language ?? "javascript",
+          consoleOutput: consoleOutput ?? "",
+          executionError: executionError ?? "",
+          testResults: testResults ?? null
         }),
       })
 
@@ -117,6 +128,60 @@ export function ChatInterface({ code, language, accessToken }: ChatInterfaceProp
           }}
           className="flex items-center gap-2"
         >
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={sending}
+            onClick={() => {
+              const text = "Please review my code coverage, efficiency, and correctness based on the test results."
+              const userMsg: Message = {
+                id: globalThis.crypto?.randomUUID?.() ?? String(Date.now()),
+                role: "user",
+                content: text,
+              }
+              const nextMessages = [...messages, userMsg]
+              setMessages(nextMessages)
+              setSending(true)
+
+              fetch(`${API_URL}/ai/gemini-chat`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+                },
+                body: JSON.stringify({
+                  messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
+                  code: code ?? "",
+                  language: language ?? "javascript",
+                  consoleOutput: consoleOutput || "",
+                  executionError: executionError || "",
+                  testResults: testResults || null
+                }),
+              })
+                .then(async (res) => {
+                  const ct = res.headers.get("content-type") || ""
+                  const data = ct.includes("application/json") ? await res.json() : null
+                  const textContent = data?.message?.content || (res.ok ? "No reply." : "Sorry, I could not generate a reply.")
+
+                  setMessages(prev => [...prev, {
+                    id: globalThis.crypto?.randomUUID?.() ?? String(Date.now() + 1),
+                    role: "assistant",
+                    content: textContent,
+                  }])
+                })
+                .catch(() => {
+                  setMessages(prev => [...prev, {
+                    id: globalThis.crypto?.randomUUID?.() ?? String(Date.now() + 2),
+                    role: "assistant",
+                    content: "Sorry, I encountered an error processing your request.",
+                  }])
+                })
+                .finally(() => setSending(false))
+            }}
+          >
+            Review Code
+          </Button>
           <Input
             placeholder="Type your answer..."
             value={input}
@@ -130,6 +195,6 @@ export function ChatInterface({ code, language, accessToken }: ChatInterfaceProp
           </Button>
         </form>
       </div>
-    </div>
+    </div >
   )
 }
