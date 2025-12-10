@@ -15,7 +15,7 @@ const handler = NextAuth({
 
                 try {
                     // Import API_URL dynamically or use hardcoded
-                    const API_URL = "http://localhost:5001/api";
+                    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api";
 
                     const res = await fetch(`${API_URL}/auth/login`, {
                         method: 'POST',
