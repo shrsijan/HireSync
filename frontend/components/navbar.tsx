@@ -1,3 +1,4 @@
+// components/navbar.tsx
 "use client"
 
 import Link from "next/link"
@@ -10,51 +11,55 @@ export function Navbar() {
 
   return (
     <nav className="border-b">
-      <div className="container mx-auto flex h-16 items-center px-10">
-        <Link href="/" className="mr-6" aria-label="Hiresync home">
+      <div className="container mx-auto flex h-24 items-center px-10">
+
+        {/* Logo */}
+        <Link
+          href="/"
+          className="mr-8 flex items-center"
+          aria-label="Hiresync home"
+        >
           <Image
             src="/logo.svg"
             alt="Hiresync"
-            width={120}
-            height={28}
-            sizes="120px"
+            width={320}    // ⬅️ Increased size further
+            height={110}
             priority
           />
         </Link>
 
-        {status === "authenticated" && (
-          <div className="mx-6 flex items-center space-x-4 lg:space-x-6">
-            <Link
-              href="/dashboard"
-              className="text-sm font-medium transition-colors hover:text-primary"
-            >
-              Dashboard
-            </Link>
-          </div>
-        )}
-
-        <div className="ml-auto flex items-center space-x-4">
+        {/* Right side (Login / Logout) */}
+        <div className="ml-auto flex items-center space-x-6">
           {status === "loading" ? (
             <div className="h-9 w-32" />
           ) : session ? (
             <Button
               variant="ghost"
-              className="text-sm font-medium"
+              className="text-lg font-bold mt-1.5"   // ⬅️ Lowered slightly
               onClick={() => signOut({ callbackUrl: "/" })}
             >
               Logout
             </Button>
           ) : (
             <>
-              <Button asChild variant="ghost" className="text-sm font-medium">
+              <Button
+                asChild
+                variant="ghost"
+                className="text-base font-medium mt-1.5"  // ⬅️ lowered to match logo alignment
+              >
                 <Link href="/login">Login</Link>
               </Button>
-              <Button asChild className="text-sm font-medium">
+
+              <Button
+                asChild
+                className="text-base font-medium mt-1.5"  // ⬅️ lowered
+              >
                 <Link href="/signup">Sign Up</Link>
               </Button>
             </>
           )}
         </div>
+
       </div>
     </nav>
   )
