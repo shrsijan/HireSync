@@ -47,13 +47,6 @@ export function CodeEditor({
             <SelectItem value="cpp">C++</SelectItem>
           </SelectContent>
         </Select>
-        <button
-          type="button"
-          onClick={onRun}
-          className="rounded-md bg-primary px-3 py-1 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          Run Code
-        </button>
       </div>
       <div className="flex-1">
         <Editor

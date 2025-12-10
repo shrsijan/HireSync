@@ -1,4 +1,5 @@
 const Assessment = require('../models/Assessment');
+const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -100,7 +101,63 @@ exports.createAssessment = async (req, res) => {
 
 exports.getAssessments = async (req, res) => {
     try {
-        const assessments = await Assessment.find({ recruiterId: req.user.id }).sort({ createdAt: -1 });
+        // Use aggregation to get stats joined with assessments
+        const assessments = await Assessment.aggregate([
+            { $match: { recruiterId: new mongoose.Types.ObjectId(req.user.id) } },
+            { $sort: { createdAt: -1 } },
+            {
+                $lookup: {
+                    from: 'invitations',
+                    localField: '_id',
+                    foreignField: 'assessmentId',
+                    as: 'invitations'
+                }
+            },
+            {
+                $lookup: {
+                    from: 'interviews', // Assuming collection name is lowercase plural
+                    localField: '_id',
+                    foreignField: 'assessmentId',
+                    as: 'interviews'
+                }
+            },
+            {
+                $addFields: {
+                    totalCandidates: { $size: "$invitations" },
+                    completedCandidates: {
+                        $size: {
+                            $filter: {
+                                input: "$interviews",
+                                as: "interview",
+                                cond: { $eq: ["$$interview.status", "completed"] }
+                            }
+                        }
+                    },
+                    avgScore: {
+                        $avg: {
+                            $map: {
+                                input: {
+                                    $filter: {
+                                        input: "$interviews",
+                                        as: "interview",
+                                        cond: { $eq: ["$$interview.status", "completed"] }
+                                    }
+                                },
+                                as: "interview",
+                                in: "$$interview.score"
+                            }
+                        }
+                    }
+                }
+            },
+            {
+                $project: {
+                    invitations: 0,
+                    interviews: 0 // Remove heavy arrays, keep only calculated fields + original doc
+                }
+            }
+        ]);
+
         res.json(assessments);
     } catch (err) {
         console.error(err.message);

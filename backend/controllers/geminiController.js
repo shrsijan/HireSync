@@ -7,26 +7,34 @@ const openai = new OpenAI({
 
 exports.chat = async (req, res) => {
     try {
-        const { messages, code, language } = req.body;
+        const { messages, code, language, consoleOutput, executionError, testResults } = req.body;
+        console.log(`[Gemini Chat] Received request. Code length: ${code?.length || 0}, Language: ${language}`);
         const stream = req.query.stream === 'true' || req.headers.accept === 'text/event-stream';
 
         // Construct the system prompt for Whiteboard Interviewer
-        const systemPrompt = `You are a technical interviewer conducting a whiteboard interview. The candidate is writing code in ${language || 'javascript'}. 
+        let systemPrompt = `You are a technical interviewer conducting a whiteboard interview. The candidate is writing code in ${language || 'javascript'}. 
 Current Code:
 \`\`\`${language || 'javascript'}
 ${code}
 \`\`\`
+
+Execution Context:
+${consoleOutput ? `Output:\n${consoleOutput}\n` : ''}
+${executionError ? `Error:\n${executionError}\n` : ''}
+${testResults ? `Test Results:\n${JSON.stringify(testResults, null, 2)}\n` : ''}
+
 Critical Formatting Rules:
 1. Format your ENTIRE response as a markdown bulleted list.
 2. Start every new thought or question with a "-" on a new line.
 3. Verify that your response renders cleanly as valid Markdown.
 
 Guidelines:
-- Do NOT execute the code or provide output.
-- Ask clarifying questions about their approach.
-- Provide hints if they are stuck, but do not give the full solution.
-- Focus on algorithmic thinking and clean code.
-- Be professional, encouraging, and concise.`;
+- **Be extremely concise.** Short, punchy sentences.
+- **NO SPOILERS.** Never provide the full solution or write code for them.
+- Ask guiding questions to help them realize their mistakes.
+- If errors exist, point them to the specific line or concept, but let them fix it.
+- Focus on algorithmic thinking.
+- Your goal is to assess, not to teach from scratch. Give minimal effective feedback.`;
 
         // Prepare messages: prepend system prompt or use the user's /think trigger if intended, 
         // but combining Persona + Thinking capability usually works by just setting the persona 

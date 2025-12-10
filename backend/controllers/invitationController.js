@@ -97,16 +97,13 @@ exports.validateInvitation = async (req, res) => {
 
         // Return relevant details to start the assessment
         res.json({
+            valid: true,
+            email: invitation.email,
             invitationId: invitation._id,
             assessment: {
-                title: assessment.title,
-                role: assessment.role,
-                description: assessment.description, // if exists
-                questions: assessment.questions,
-                timeLimit: assessment.timeLimit,
-                companyName: assessment.recruiterId ? assessment.recruiterId.companyName : "Tech Corp"
-            },
-            candidateEmail: invitation.email
+                ...assessment.toObject(),
+                companyName: "TechCorp Inc." // Placeholder or fetch from Recruiter profile
+            }
         });
 
     } catch (err) {
@@ -118,22 +115,37 @@ exports.validateInvitation = async (req, res) => {
 exports.getInvitationsByCandidate = async (req, res) => {
     try {
         const { email } = req.params;
-        const invitations = await Invitation.find({ email })
+        // Escape special regex characters to prevent errors/injection
+        const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // Use case-insensitive regex for email matching
+        const invitations = await Invitation.find({ email: { $regex: new RegExp(`^${escapedEmail}$`, 'i') } })
             .populate('assessmentId', 'title role timeLimit expiryDate')
             .sort({ createdAt: -1 });
 
-        // Transform to match frontend interface
-        const formattedInvitations = invitations.map(inv => ({
-            _id: inv._id,
-            companyName: "Tech Corp", // Placeholder or fetch from Recruiter/Company model if available
-            role: inv.assessmentId ? inv.assessmentId.role : 'N/A',
-            status: inv.status,
-            title: inv.assessmentId ? inv.assessmentId.title : 'Assessment',
-            assessment: {
-                timeLimit: inv.assessmentId ? inv.assessmentId.timeLimit : 0,
-                expiryDate: inv.assessmentId ? inv.assessmentId.expiryDate : null
-            },
-            createdAt: inv.createdAt
+        // Transform and add interview details if completed
+        const formattedInvitations = await Promise.all(invitations.map(async (inv) => {
+            let score = null;
+            if (inv.status === 'completed') {
+                const Interview = require('../models/Interview');
+                const interview = await Interview.findOne({ invitationId: inv._id });
+                if (interview) {
+                    score = interview.score;
+                }
+            }
+
+            return {
+                _id: inv._id,
+                companyName: "Tech Corp", // Placeholder
+                role: inv.assessmentId ? inv.assessmentId.role : 'N/A',
+                status: inv.status,
+                score: score, // Added score
+                title: inv.assessmentId ? inv.assessmentId.title : 'Assessment',
+                assessment: {
+                    timeLimit: inv.assessmentId ? inv.assessmentId.timeLimit : 0,
+                    expiryDate: inv.assessmentId ? inv.assessmentId.expiryDate : null
+                },
+                createdAt: inv.createdAt
+            };
         }));
 
         res.json(formattedInvitations);

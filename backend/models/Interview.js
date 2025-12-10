@@ -32,6 +32,10 @@ const interviewSchema = new mongoose.Schema({
         ref: 'Invitation',
         required: false
     },
+    token: {
+        type: String,
+        required: false // Optional for backward compatibility, but should be populated for new ones
+    },
     candidateEmail: {
         type: String, // For invited candidates without account
         required: false
@@ -57,6 +61,20 @@ const interviewSchema = new mongoose.Schema({
     },
     score: {
         type: Number,
+    },
+    categoryScores: {
+        codeQuality: Number,
+        problemSolving: Number,
+        communication: Number,
+        verification: Number
+    },
+    report: {
+        summary: String,
+        strengths: [String],
+        weaknesses: [String],
+        codeAnalysis: String,
+        scoreExplanation: String,
+        generatedAt: Date
     },
     feedback: {
         type: String,

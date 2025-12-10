@@ -11,8 +11,9 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // Frontend URL
-    methods: ["GET", "POST"]
+    origin: ["http://localhost:3000", process.env.FRONTEND_URL || "*"], // Allow env var or wildcard
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -24,6 +25,7 @@ app.use('/api/ai', require('./routes/ai'));
 app.use('/api/execute', require('./routes/execution'));
 app.use('/api/assessments', require('./routes/assessment'));
 app.use('/api/invitations', require('./routes/invitation'));
+app.use('/api/interviews', require('./routes/interview'));
 app.use('/uploads', express.static('uploads'));
 
 const PORT = process.env.PORT || 5001;
