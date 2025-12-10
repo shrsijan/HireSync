@@ -11,12 +11,12 @@ export function Navbar() {
 
   return (
     <nav className="border-b">
-      <div className="container mx-auto relative flex h-24 items-center px-10">
+      <div className="container mx-auto flex h-24 items-center px-10">
 
         {/* Logo (left) */}
         <Link
           href="/"
-          className="mr-8 flex items-center"
+          className="mr-4 flex items-center"
           aria-label="Hiresync home"
         >
           <Image
@@ -28,15 +28,13 @@ export function Navbar() {
           />
         </Link>
 
-        {/* Dashboard (true center) */}
-        <div className="absolute left-1/2 -translate-x-1/2">
-          <Link
-            href="/dashboard"
-            className="text-xl font-semibold hover:underline"
-          >
-            Dashboard
-          </Link>
-        </div>
+        {/* Dashboard (closer + smaller + moved down) */}
+        <Link
+          href="/dashboard"
+          className="text-base font-medium hover:underline ml-1 mt-2"
+        >
+          Dashboard
+        </Link>
 
         {/* Right side (Login / Logout) */}
         <div className="ml-auto flex items-center space-x-6">
