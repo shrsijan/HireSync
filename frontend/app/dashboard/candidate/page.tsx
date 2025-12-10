@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowRight, Calendar, Clock, Building2, TrendingUp, Award, CheckCircle2, Plus, X, Loader2 } from "lucide-react"
+import { API_URL } from "@/lib/config"
 
 interface Invitation {
     _id: string
@@ -56,7 +57,7 @@ export default function CandidateDashboard() {
 
             // Ensure absolute URL if running server-side or if proxy not set
             // Ideally use config
-            const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
+            // API_URL imported from config
 
             const res = await fetch(`${API_URL}/invitations/candidate/${email}`, {
                 headers: {
@@ -102,7 +103,7 @@ export default function CandidateDashboard() {
         setError("");
 
         try {
-            const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001/api"
+            // API_URL imported from config
 
             const res = await fetch(`${API_URL}/invitations/validate`, {
                 method: 'POST',

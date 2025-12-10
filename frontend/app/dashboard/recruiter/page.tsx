@@ -27,6 +27,7 @@ interface Assessment {
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { API_URL } from "@/lib/config"
 
 export default function RecruiterDashboard() {
     const { data: session } = useSession()
@@ -59,7 +60,7 @@ export default function RecruiterDashboard() {
         try {
             // @ts-ignore
             const token = session?.user?.accessToken || ""
-            const res = await fetch("http://localhost:5001/api/assessments", {
+            const res = await fetch(`${API_URL}/assessments`, {
                 headers: {
                     "Authorization": `Bearer ${token}`
                 }
@@ -124,7 +125,7 @@ export default function RecruiterDashboard() {
 
             // @ts-ignore
             const token = session?.user?.accessToken || ""
-            const res = await fetch("http://localhost:5001/api/assessments", {
+            const res = await fetch(`${API_URL}/assessments`, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`
@@ -149,7 +150,7 @@ export default function RecruiterDashboard() {
         try {
             // @ts-ignore
             const token = session?.user?.accessToken || ""
-            const res = await fetch("http://localhost:5001/api/invitations", {
+            const res = await fetch(`${API_URL}/invitations`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -188,7 +189,7 @@ export default function RecruiterDashboard() {
 
             // @ts-ignore
             const token = session?.user?.accessToken || ""
-            const res = await fetch("http://localhost:5001/api/invitations/bulk", {
+            const res = await fetch(`${API_URL}/invitations/bulk`, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${token}`
@@ -216,7 +217,7 @@ export default function RecruiterDashboard() {
             const token = session?.user?.accessToken || ""
             // Fetch all invitations and filter for this assessment. 
             // Ideally we'd have a specific endpoint but filtering works for now given the implementation.
-            const res = await fetch("http://localhost:5001/api/invitations", {
+            const res = await fetch(`${API_URL}/invitations`, {
                 headers: { "Authorization": `Bearer ${token}` }
             })
             if (res.ok) {
@@ -491,7 +492,7 @@ function InterviewResults({ assessmentId }: { assessmentId: string }) {
             // @ts-ignore
             const token = session?.user?.accessToken || ""
 
-            const res = await fetch(`http://localhost:5001/api/interviews/assessment/${assessmentId}`, {
+            const res = await fetch(`${API_URL}/interviews/assessment/${assessmentId}`, {
                 headers: { "Authorization": `Bearer ${token}` }
             })
             console.log("Fetch results response status:", res.status);

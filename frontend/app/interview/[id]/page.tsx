@@ -26,6 +26,7 @@ import {
     Lightbulb,
     X
 } from "lucide-react"
+import { API_URL } from "@/lib/config"
 
 const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
@@ -66,7 +67,7 @@ export default function InterviewPage() {
             if (!inviteCode) return;
 
             try {
-                const API_URL = "http://localhost:5001/api";
+                // API_URL imported from config
                 const res = await fetch(`${API_URL}/invitations/validate`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -138,7 +139,7 @@ export default function InterviewPage() {
 
         setIsSubmitting(true);
         try {
-            const API_URL = "http://localhost:5001/api";
+            // API_URL imported from config
             const res = await fetch(`${API_URL}/interviews/submit`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
