@@ -66,6 +66,7 @@ export default function SignupForm() {
                     // Fallback to login page if auto-login fails
                     router.push("/login")
                 } else {
+                    router.refresh()
                     router.push("/dashboard")
                 }
             } else {

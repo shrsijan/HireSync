@@ -1,74 +1,56 @@
-// components/navbar.tsx
 "use client"
 
 import Link from "next/link"
 import Image from "next/image"
 import { useSession, signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
+import Logo from "@/public/logo.svg";
 
 export function Navbar() {
-  const { data: session, status } = useSession()
+    const { data: session } = useSession()
 
-  return (
-    <nav className="border-b">
-      <div className="container mx-auto flex h-24 items-center px-10">
+    return (
+        <nav className="border-b">
+            <div className="flex h-16 items-center px-10 container mx-auto">
+                <Link href="/" className="mr-6">
+                    <Image src={Logo} alt="Logo" width={300} height={300} />
+                </Link>
 
-        {/* Logo (left) */}
-        <Link
-          href="/"
-          className="mr-4 flex items-center"
-          aria-label="Hiresync home"
-        >
-          <Image
-            src="/logo.svg"
-            alt="Hiresync"
-            width={350}
-            height={150}
-            priority
-          />
-        </Link>
-
-        {/* Dashboard (closer + smaller + moved down) */}
-        <Link
-          href="/dashboard"
-          className="text-base font-medium hover:underline ml-1 mt-2"
-        >
-          Dashboard
-        </Link>
-
-        {/* Right side (Login / Logout) */}
-        <div className="ml-auto flex items-center space-x-6">
-          {status === "loading" ? (
-            <div className="h-9 w-32" />
-          ) : session ? (
-            <Button
-              variant="ghost"
-              className="text-lg font-bold mt-1.5"
-              onClick={() => signOut({ callbackUrl: "/" })}
-            >
-              Logout
-            </Button>
-          ) : (
-            <>
-              <Button
-                asChild
-                variant="ghost"
-                className="text-base font-medium mt-1.5"
-              >
-                <Link href="/login">Login</Link>
-              </Button>
-
-              <Button
-                asChild
-                className="text-base font-medium mt-1.5"
-              >
-                <Link href="/signup">Sign Up</Link>
-              </Button>
-            </>
-          )}
-        </div>
-
-      </div>
-    </nav>
-  )
+                {session && (
+                    <div className="flex items-center space-x-4 lg:space-x-6 mx-6">
+                        <Link
+                            href="/dashboard"
+                            className="text-sm font-medium transition-colors hover:text-primary"
+                        >
+                        Dashboard
+                        </Link>
+                    </div>
+                )}
+                <div className="ml-auto flex items-center space-x-4">
+                    {session ? (
+                        <Button
+                            variant="ghost"
+                            onClick={() => signOut({ callbackUrl: "/" })}
+                            className="text-sm font-medium"
+                        >
+                            Logout
+                        </Button>
+                    ) : (
+                        <>
+                            <Link href="/login">
+                                <Button variant="ghost" className="text-sm font-medium">
+                                    Login
+                                </Button>
+                            </Link>
+                            <Link href="/signup">
+                                <Button className="text-sm font-medium">
+                                    Sign Up
+                                </Button>
+                            </Link>
+                        </>
+                    )}
+                </div>
+            </div>
+        </nav>
+    )
 }
